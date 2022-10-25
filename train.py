@@ -12,9 +12,10 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 weight_path = 'params/unet.pth'
 data_path = r'data'
 save_path = 'train_image'
+
 if __name__ == '__main__':
     num_classes = 2 + 1  # +1是背景也为一类
-    data_loader = DataLoader(MyDataset(data_path), batch_size=1, shuffle=True)
+    data_loader = DataLoader(MyDataset(data_path), batch_size=2, shuffle=True)
     net = UNet(num_classes).to(device)
     if os.path.exists(weight_path):
         net.load_state_dict(torch.load(weight_path))
@@ -22,8 +23,8 @@ if __name__ == '__main__':
     else:
         print('not successful load weight')
 
-    opt = optim.Adam(net.parameters())
-    loss_fun = nn.CrossEntropyLoss()
+    opt = optim.Adam(net.parameters()) #adam优化器
+    loss_fun = nn.CrossEntropyLoss() #or nn.BCRLoss()
 
     epoch = 1
     while epoch < 200:
@@ -31,20 +32,23 @@ if __name__ == '__main__':
             image, segment_image = image.to(device), segment_image.to(device)
             out_image = net(image)
             train_loss = loss_fun(out_image, segment_image.long())
+
             opt.zero_grad()
             train_loss.backward()
             opt.step()
 
-            if i % 1 == 0:
+            if i % 1 == 0: #输出loss
                 print(f'{epoch}-{i}-train_loss===>>{train_loss.item()}')
 
-            _image = image[0]
-            _segment_image = torch.unsqueeze(segment_image[0], 0) * 255
-            _out_image = torch.argmax(out_image[0], dim=0).unsqueeze(0) * 255
+            #可视化结果
+            _image = image[0] #原图
+            _segment_image = torch.unsqueeze(segment_image[0], 0) * 255 #标签
+            _out_image = torch.argmax(out_image[0], dim=0).unsqueeze(0) * 255 #模型输出
 
-            img = torch.stack([_segment_image, _out_image], dim=0)
+            img = torch.stack([_segment_image, _out_image], dim=0) #拼接标签和输出
             save_image(img, f'{save_path}/{i}.png')
-        if epoch % 20 == 0:
+
+        if epoch % 20 == 0: #保存权重
             torch.save(net.state_dict(), weight_path)
             print('save successfully!')
         epoch += 1
